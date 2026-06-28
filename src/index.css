@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Suraksha Crime Reporting Platform Design System */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Core Brand Colors */
+    --background: 0 0% 100%;
+    --foreground: 216 32% 17%;
+    
+    /* Primary - Trust & Authority */
+    --primary: 216 84% 16%;
+    --primary-light: 216 84% 25%;
+    --primary-foreground: 0 0% 98%;
+    
+    /* Emergency Red */
+    --emergency: 0 86% 57%;
+    --emergency-dark: 0 86% 45%;
+    --emergency-light: 0 86% 95%;
+    --emergency-foreground: 0 0% 98%;
+    
+    /* Success Green */
+    --success: 145 63% 49%;
+    --success-light: 145 63% 95%;
+    --success-foreground: 0 0% 98%;
+    
+    /* Warning Orange */
+    --warning: 38 92% 50%;
+    --warning-light: 38 92% 95%;
+    --warning-foreground: 0 0% 98%;
+    
+    /* Neutral System */
+    --card: 0 0% 100%;
+    --card-foreground: 216 32% 17%;
+    --muted: 216 12% 96%;
+    --muted-foreground: 216 12% 45%;
+    --border: 216 12% 88%;
+    --input: 216 12% 88%;
+    --ring: 216 84% 16%;
+    
+    /* Interactive */
+    --accent: 216 84% 95%;
+    --accent-foreground: 216 84% 16%;
+    --destructive: 0 86% 57%;
+    --destructive-foreground: 0 0% 98%;
+    
+    /* Secondary Colors */
+    --secondary: 216 12% 96%;
+    --secondary-foreground: 216 32% 17%;
+    
+    /* Popover */
+    --popover: 0 0% 100%;
+    --popover-foreground: 216 32% 17%;
+    
+    /* Sidebar Colors */
+    --sidebar-background: 216 32% 12%;
+    --sidebar-foreground: 216 12% 88%;
+    --sidebar-primary: 216 84% 25%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 216 32% 20%;
+    --sidebar-accent-foreground: 216 12% 88%;
+    --sidebar-border: 216 32% 20%;
+    --sidebar-ring: 216 84% 16%;
+    
+    /* Custom Properties */
+    --hero-gradient: linear-gradient(135deg, hsl(216 84% 16%) 0%, hsl(216 84% 25%) 100%);
+    --emergency-gradient: linear-gradient(135deg, hsl(0 86% 57%) 0%, hsl(0 86% 45%) 100%);
+    --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --card-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 216 32% 12%;
+    --foreground: 0 0% 98%;
+    --card: 216 32% 15%;
+    --card-foreground: 0 0% 98%;
+    --popover: 216 32% 15%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 216 84% 25%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 216 32% 20%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 216 32% 20%;
+    --muted-foreground: 216 12% 65%;
+    --accent: 216 32% 20%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 86% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 216 32% 20%;
+    --input: 216 32% 20%;
+    --ring: 216 84% 25%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+}
+
+@layer components {
+  .hero-gradient {
+    background: var(--hero-gradient);
+  }
+  
+  .emergency-gradient {
+    background: var(--emergency-gradient);
+  }
+  
+  .card-shadow {
+    box-shadow: var(--card-shadow);
+  }
+  
+  .card-shadow-lg {
+    box-shadow: var(--card-shadow-lg);
+  }
+}
