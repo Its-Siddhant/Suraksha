@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, MapPin, Phone, CheckCircle2, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 
 interface Location {
   latitude: number;
@@ -31,28 +32,31 @@ const SOS = () => {
     { id: "3", name: "District Police Station", distance: "2.1 km", contact: "+91-11-2345-6791", status: "busy" },
   ];
 
-  const saveAlertToStorage = (lat: number, lng: number) => {
-    const existing = JSON.parse(localStorage.getItem("sosAlerts") || "[]");
-    if (existing.length > 0) {
-      existing[0].location = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
-      existing[0].latitude = lat;
-      existing[0].longitude = lng;
-      localStorage.setItem("sosAlerts", JSON.stringify(existing));
-    }
+  const saveAlertToSupabase = async (lat: number, lng: number, alertId: string) => {
+    const { error } = await supabase
+      .from("sos_alerts")
+      .update({
+        location: `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`,
+        latitude: lat,
+        longitude: lng,
+      })
+      .eq("id", alertId);
+
+    if (error) console.error("Error updating location:", error);
   };
 
-  const getLocation = () => {
+  const getLocation = (alertId: string) => {
     setIsGettingLocation(true);
 
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const { latitude, longitude } = position.coords;
           setLocation({ latitude, longitude });
           setIsGettingLocation(false);
-          saveAlertToStorage(latitude, longitude);
+          await saveAlertToSupabase(latitude, longitude, alertId);
         },
-        (error) => {
+        async (error) => {
           console.error("Error getting location:", error);
           setIsGettingLocation(false);
           toast({
@@ -62,22 +66,24 @@ const SOS = () => {
           });
           const lat = 28.6139, lng = 77.2090;
           setLocation({ latitude: lat, longitude: lng });
-          saveAlertToStorage(lat, lng);
+          await saveAlertToSupabase(lat, lng, alertId);
         }
       );
     } else {
       setIsGettingLocation(false);
       const lat = 28.6139, lng = 77.2090;
       setLocation({ latitude: lat, longitude: lng });
-      saveAlertToStorage(lat, lng);
+      saveAlertToSupabase(lat, lng, alertId);
     }
   };
 
-  const handleSOSActivation = () => {
+  const handleSOSActivation = async () => {
     setIsActivated(true);
 
-    const newAlert = {
-      id: `SR${Date.now()}`,
+    const alertId = `SR${Date.now()}`;
+
+    const { error } = await supabase.from("sos_alerts").insert({
+      id: alertId,
       title: "SOS Emergency Alert",
       category: "sos",
       location: "Getting location...",
@@ -86,13 +92,19 @@ const SOS = () => {
       status: "sos",
       timestamp: new Date().toLocaleString("en-IN"),
       priority: "critical"
-    };
+    });
 
-    const existing = JSON.parse(localStorage.getItem("sosAlerts") || "[]");
-    existing.unshift(newAlert);
-    localStorage.setItem("sosAlerts", JSON.stringify(existing));
+    if (error) {
+      console.error("Error saving SOS alert:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send SOS alert. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    getLocation();
+    getLocation(alertId);
 
     setTimeout(() => {
       setAlertSent(true);
@@ -120,7 +132,6 @@ const SOS = () => {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
-          {/* SOS Button Section */}
           <div className="text-center">
             {!isActivated ? (
               <div>
@@ -182,7 +193,6 @@ const SOS = () => {
             )}
           </div>
 
-          {/* Information Panel */}
           <div className="space-y-6">
             {alertSent && (
               <Alert className="bg-success/20 border-success/30 text-white">

@@ -8,21 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Shield,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  FileText,
-  LogOut,
-  Eye,
-  MapPin,
-  X
+  Shield, AlertTriangle, CheckCircle2, Clock,
+  FileText, LogOut, Eye, MapPin, X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fix leaflet default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -42,108 +35,59 @@ interface Report {
   priority: "low" | "medium" | "high" | "critical";
 }
 
+const playBeep = () => {
+  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const beep = (startTime: number) => {
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.value = 880;
+    gainNode.gain.setValueAtTime(0.8, startTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+    oscillator.start(startTime);
+    oscillator.stop(startTime + 0.4);
+  };
+  for (let i = 0; i < 5; i++) beep(audioCtx.currentTime + i * 1.0);
+};
+
 const dummyReports: Report[] = [
-  {
-    id: "SR001234",
-    title: "Theft of mobile phone",
-    category: "theft",
-    location: "Central Park, Delhi",
-    status: "in-action",
-    timestamp: "2026-05-02 14:30",
-    priority: "high"
-  },
-  {
-    id: "SR001235",
-    title: "Harassment complaint",
-    category: "harassment",
-    location: "Metro Station, Mumbai",
-    status: "in-action",
-    timestamp: "2026-05-11 13:45",
-    priority: "high"
-  },
-  {
-    id: "SR001236",
-    title: "Fraudulent transaction",
-    category: "fraud",
-    location: "Online Banking",
-    status: "received",
-    timestamp: "2026-05-23 12:20",
-    priority: "medium"
-  },
-  {
-    id: "SR001237",
-    title: "Domestic violence case",
-    category: "violence",
-    location: "Residential Area, Bangalore",
-    status: "resolved",
-    timestamp: "2026-06-04 18:15",
-    priority: "high"
-  },
-  {
-    id: "SR001238",
-    title: "Cybercrime report",
-    category: "cybercrime",
-    location: "Online Platform",
-    status: "in-action",
-    timestamp: "2026-06-17 16:30",
-    priority: "medium"
-  }
+  { id: "SR001234", title: "Theft of mobile phone", category: "theft", location: "Central Park, Delhi", status: "in-action", timestamp: "2026-05-02 14:30", priority: "high" },
+  { id: "SR001235", title: "Harassment complaint", category: "harassment", location: "Metro Station, Mumbai", status: "in-action", timestamp: "2026-05-11 13:45", priority: "high" },
+  { id: "SR001236", title: "Fraudulent transaction", category: "fraud", location: "Online Banking", status: "received", timestamp: "2026-05-23 12:20", priority: "medium" },
+  { id: "SR001237", title: "Domestic violence case", category: "violence", location: "Residential Area, Bangalore", status: "resolved", timestamp: "2026-06-04 18:15", priority: "high" },
+  { id: "SR001238", title: "Cybercrime report", category: "cybercrime", location: "Online Platform", status: "in-action", timestamp: "2026-06-17 16:30", priority: "medium" },
 ];
 
-// Map Modal Component
 const MapModal = ({ report, onClose }: { report: Report; onClose: () => void }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
-
     const lat = report.latitude ?? 28.6139;
     const lng = report.longitude ?? 77.2090;
-
     const map = L.map(mapRef.current).setView([lat, lng], 15);
     mapInstanceRef.current = map;
-
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap contributors"
     }).addTo(map);
-
-    // Red pulsing marker for SOS
     const redIcon = L.divIcon({
       className: "",
-      html: `<div style="
-        width: 20px; height: 20px;
-        background: red;
-        border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 0 0 3px red, 0 0 15px red;
-        animation: pulse 1.5s infinite;
-      "></div>`,
+      html: `<div style="width:20px;height:20px;background:red;border-radius:50%;border:3px solid white;box-shadow:0 0 0 3px red,0 0 15px red;"></div>`,
       iconSize: [20, 20],
       iconAnchor: [10, 10]
     });
-
-    L.marker([lat, lng], { icon: redIcon })
-      .addTo(map)
-      .bindPopup(`
-        <div style="text-align:center">
-          <strong>🚨 SOS Alert</strong><br/>
-          <span style="font-size:12px">${report.title}</span><br/>
-          <span style="font-size:11px;color:#666">${report.timestamp}</span>
-        </div>
-      `)
+    L.marker([lat, lng], { icon: redIcon }).addTo(map)
+      .bindPopup(`<div style="text-align:center"><strong>🚨 SOS Alert</strong><br/><span style="font-size:12px">${report.title}</span><br/><span style="font-size:11px;color:#666">${report.timestamp}</span></div>`)
       .openPopup();
-
-    return () => {
-      map.remove();
-      mapInstanceRef.current = null;
-    };
+    return () => { map.remove(); mapInstanceRef.current = null; };
   }, []);
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden">
-        {/* Modal Header */}
         <div className="bg-primary text-white p-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
@@ -152,39 +96,22 @@ const MapModal = ({ report, onClose }: { report: Report; onClose: () => void }) 
               <p className="text-sm text-white/70">{report.location}</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="text-white hover:bg-white/20"
-          >
+          <Button variant="ghost" size="sm" onClick={onClose} className="text-white hover:bg-white/20">
             <X className="h-5 w-5" />
           </Button>
         </div>
-
-        {/* Map */}
         <div ref={mapRef} style={{ height: "400px", width: "100%" }} />
-
-        {/* Footer Info */}
         <div className="p-4 bg-red-50 border-t border-red-100 flex justify-between items-center">
           <div className="text-sm text-gray-600">
             <span className="font-medium text-red-600">🚨 Emergency Alert</span>
-            <span className="mx-2">·</span>
-            {report.location}
-            <span className="mx-2">·</span>
-            {report.timestamp}
+            <span className="mx-2">·</span>{report.location}
+            <span className="mx-2">·</span>{report.timestamp}
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              const lat = report.latitude ?? 28.6139;
-              const lng = report.longitude ?? 77.2090;
-              window.open(`https://www.google.com/maps?q=${lat},${lng}`, "_blank");
-            }}
-          >
-            Open in Google Maps
-          </Button>
+          <Button size="sm" variant="outline" onClick={() => {
+            const lat = report.latitude ?? 28.6139;
+            const lng = report.longitude ?? 77.2090;
+            window.open(`https://www.google.com/maps?q=${lat},${lng}`, "_blank");
+          }}>Open in Google Maps</Button>
         </div>
       </div>
     </div>
@@ -197,35 +124,93 @@ const Dashboard = () => {
   const [reports, setReports] = useState<Report[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [activeSOSIds, setActiveSOSIds] = useState<Set<string>>(new Set());
+  const beepIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
-  const mergeReports = () => {
-    const savedAlerts: Report[] = JSON.parse(localStorage.getItem("sosAlerts") || "[]");
-    const savedDummyStatuses: Record<string, Report["status"]> = JSON.parse(localStorage.getItem("dummyStatuses") || "{}");
+  const fetchAndMerge = async () => {
+    const { data, error } = await supabase
+      .from("sos_alerts")
+      .select("*")
+      .order("timestamp", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching alerts:", error);
+      return;
+    }
+
+    const savedDummyStatuses: Record<string, Report["status"]> = JSON.parse(
+      localStorage.getItem("dummyStatuses") || "{}"
+    );
 
     const updatedDummy = dummyReports.map(r => ({
       ...r,
       status: savedDummyStatuses[r.id] ?? r.status
     }));
 
-    const dummyIds = new Set(dummyReports.map(r => r.id));
-    const uniqueSavedAlerts = savedAlerts.filter(r => !dummyIds.has(r.id));
-    return [...uniqueSavedAlerts, ...updatedDummy];
+    const supabaseIds = new Set((data || []).map((r: Report) => r.id));
+    const filteredDummy = updatedDummy.filter(r => !supabaseIds.has(r.id));
+    setReports([...(data || []), ...filteredDummy]);
   };
 
+  // Load on login
   useEffect(() => {
-    if (isLoggedIn) {
-      setReports(mergeReports());
-    }
+    if (isLoggedIn) fetchAndMerge();
   }, [isLoggedIn]);
 
+  // Real-time Supabase listener
   useEffect(() => {
     if (!isLoggedIn) return;
-    const interval = setInterval(() => {
-      setReports(mergeReports());
-    }, 3000);
-    return () => clearInterval(interval);
+
+    const channel = supabase
+      .channel("sos_alerts_changes")
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "sos_alerts"
+      }, () => {
+        fetchAndMerge();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [isLoggedIn]);
+
+  // Beep on unresolved SOS
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const unresolvedSOS = reports.filter(r => r.status === "sos" && r.category === "sos");
+    const unresolvedIds = new Set(unresolvedSOS.map(r => r.id));
+    const hasNewSOS = unresolvedSOS.some(r => !activeSOSIds.has(r.id));
+
+    if (unresolvedSOS.length > 0) {
+      if (hasNewSOS) {
+        playBeep();
+        setActiveSOSIds(unresolvedIds);
+      }
+      if (beepIntervalRef.current) clearInterval(beepIntervalRef.current);
+      beepIntervalRef.current = setInterval(() => {
+        const stillUnresolved = reports.filter(r => r.status === "sos" && r.category === "sos");
+        if (stillUnresolved.length > 0) {
+          playBeep();
+        } else {
+          if (beepIntervalRef.current) {
+            clearInterval(beepIntervalRef.current);
+            beepIntervalRef.current = null;
+          }
+        }
+      }, 60000);
+    } else {
+      if (beepIntervalRef.current) {
+        clearInterval(beepIntervalRef.current);
+        beepIntervalRef.current = null;
+      }
+      setActiveSOSIds(new Set());
+    }
+
+    return () => { if (beepIntervalRef.current) clearInterval(beepIntervalRef.current); };
+  }, [reports, isLoggedIn]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,22 +222,23 @@ const Dashboard = () => {
     }
   };
 
-  const handleStatusUpdate = (reportId: string, newStatus: string) => {
+  const handleStatusUpdate = async (reportId: string, newStatus: string) => {
     setReports(prev =>
-      prev.map(report =>
-        report.id === reportId ? { ...report, status: newStatus as Report["status"] } : report
-      )
+      prev.map(r => r.id === reportId ? { ...r, status: newStatus as Report["status"] } : r)
     );
 
-    const savedAlerts: Report[] = JSON.parse(localStorage.getItem("sosAlerts") || "[]");
-    const updatedAlerts = savedAlerts.map(r =>
-      r.id === reportId ? { ...r, status: newStatus as Report["status"] } : r
-    );
-    localStorage.setItem("sosAlerts", JSON.stringify(updatedAlerts));
+    // Try updating in Supabase first
+    const { error } = await supabase
+      .from("sos_alerts")
+      .update({ status: newStatus })
+      .eq("id", reportId);
 
-    const savedDummyStatuses = JSON.parse(localStorage.getItem("dummyStatuses") || "{}");
-    savedDummyStatuses[reportId] = newStatus;
-    localStorage.setItem("dummyStatuses", JSON.stringify(savedDummyStatuses));
+    // If not in Supabase (dummy report), save to localStorage
+    if (error) {
+      const savedDummyStatuses = JSON.parse(localStorage.getItem("dummyStatuses") || "{}");
+      savedDummyStatuses[reportId] = newStatus;
+      localStorage.setItem("dummyStatuses", JSON.stringify(savedDummyStatuses));
+    }
 
     toast({ title: "Status Updated", description: `Report ${reportId} status changed to ${newStatus}` });
   };
@@ -261,10 +247,7 @@ const Dashboard = () => {
     if (report.category === "sos" && (report.latitude || report.longitude)) {
       setSelectedReport(report);
     } else {
-      toast({
-        title: "No Map Available",
-        description: "Map view is only available for SOS alerts with GPS coordinates.",
-      });
+      toast({ title: "No Map Available", description: "Map view is only available for SOS alerts with GPS coordinates." });
     }
   };
 
@@ -291,7 +274,6 @@ const Dashboard = () => {
   };
 
   const filteredReports = filter === "all" ? reports : reports.filter(r => r.status === filter);
-
   const stats = {
     total: reports.length,
     sos: reports.filter(r => r.status === "sos").length,
@@ -339,12 +321,8 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Map Modal */}
-      {selectedReport && (
-        <MapModal report={selectedReport} onClose={() => setSelectedReport(null)} />
-      )}
+      {selectedReport && <MapModal report={selectedReport} onClose={() => setSelectedReport(null)} />}
 
-      {/* Header */}
       <div className="bg-primary text-primary-foreground p-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -353,14 +331,12 @@ const Dashboard = () => {
           </div>
           <Button variant="outline" size="sm" onClick={() => setIsLoggedIn(false)}
             className="bg-white text-primary border-white hover:bg-white/90 hover:text-primary">
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
+            <LogOut className="h-4 w-4 mr-2" />Logout
           </Button>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
           <Card><CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -369,7 +345,6 @@ const Dashboard = () => {
               <FileText className="h-8 w-8 text-primary" />
             </div>
           </CardContent></Card>
-
           <Card><CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div><p className="text-sm font-medium text-muted-foreground">Active SOS</p>
@@ -377,7 +352,6 @@ const Dashboard = () => {
               <AlertTriangle className="h-8 w-8 text-red-600" />
             </div>
           </CardContent></Card>
-
           <Card><CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div><p className="text-sm font-medium text-muted-foreground">In Progress</p>
@@ -385,7 +359,6 @@ const Dashboard = () => {
               <Clock className="h-8 w-8 text-yellow-600" />
             </div>
           </CardContent></Card>
-
           <Card><CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div><p className="text-sm font-medium text-muted-foreground">Resolved</p>
@@ -395,13 +368,12 @@ const Dashboard = () => {
           </CardContent></Card>
         </div>
 
-        {/* Reports Table */}
         <Card className="card-shadow">
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <CardTitle>Crime Reports</CardTitle>
-                <CardDescription>Monitor and manage reported incidents · Auto-refreshes every 3s</CardDescription>
+                <CardDescription>Monitor and manage reported incidents · Live real-time updates ⚡</CardDescription>
               </div>
               <Select value={filter} onValueChange={setFilter}>
                 <SelectTrigger className="w-40"><SelectValue placeholder="Filter by status" /></SelectTrigger>
@@ -454,7 +426,6 @@ const Dashboard = () => {
                             size="sm"
                             variant={report.category === "sos" && report.latitude ? "default" : "outline"}
                             onClick={() => handleViewReport(report)}
-                            title={report.category === "sos" ? "View on Map" : "No map available"}
                           >
                             {report.category === "sos" && report.latitude
                               ? <MapPin className="h-4 w-4" />
