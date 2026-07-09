@@ -94,15 +94,18 @@ const SOS = () => {
       priority: "critical"
     });
 
-    if (error) {
-      console.error("Error saving SOS alert:", error);
-      toast({
-        title: "Error",
-        description: "Failed to send SOS alert. Please try again.",
-        variant: "destructive",
-      });
-      return;
-    }
+if (error) {
+  console.log(error);
+  console.log(JSON.stringify(error, null, 2));
+
+  toast({
+    title: "Error",
+    description: error.message,
+    variant: "destructive",
+  });
+
+  return;
+}
 
     getLocation(alertId);
 
